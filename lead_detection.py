@@ -11,111 +11,13 @@ import os
 import time
 import gdal
 import shutil
-# import subprocess
 import joblib
 
-# from matplotlib.pyplot import imsave
-# from scipy.misc import imresize
-# from cv2 import medianBlur as median_filter
-# from scipy.ndimage.filters import uniform_filter
 from cv2 import bilateralFilter
 
 from haralick import haralick
-from sentinel1.sentinel1 import Sentinel1Product
+from sentinel1 import Sentinel1Product
             
-
-# def merge_steps(fld):
-#     full = os.listdir(fld)
-#     d = [i for i in full if 'EW_GRDM_1SDH' in i]
-#     s = [i for i in full if 'EW_GRDM_1SSH' in i]
-#     d_d = [fld + i + '/leads_proj.tiff' for i in d]
-#     d_s = [fld + i + '/leads_single_proj.tiff' for i in d]
-#     s_s = [fld + i + '/leads_single_proj.tiff' for i in s]
-#     t = time.time()
-#     subprocess.call('gdal_merge.py -n 0 -ot byte -ps 80 80 -ul_lr -2000000 2000000 2000000 -2000000 -o {0} {1}'.format(fld + 'd_d_daily_new.tiff', ' '.join(d_d)), shell=True)
-#     print 'd_d done', time.time() - t
-#     subprocess.call('gdal_merge.py -n 0 -ot byte -ps 80 80 -ul_lr -2000000 2000000 2000000 -2000000 -o {0} {1}'.format(fld + 'd_s_daily.tiff', ' '.join(d_s)), shell=True)
-#     print 'd_s done', time.time() - t
-#     subprocess.call('gdal_merge.py -n 0 -ot byte -ps 80 80 -ul_lr -2000000 2000000 2000000 -2000000 -o {0} {1}'.format(fld + 's_s_daily.tiff', ' '.join(s_s)), shell=True)
-#     print 's_s done', time.time() - t
-#     return True
-#     
-#     
-# def sea_ice_mask(fld, x_size=10000, y_size=10000):
-#     """ Fuction returns mask of ice. The mask is calculated from daily Sea Ice Concentration Map
-#         (Product of the University of Bremen based on AMSR2 data)
-#         pyresample library is required.
-#     """
-#     from pyresample import geometry, kd_tree
-#     list_dir = os.listdir(fld)
-#     datafile = [i for i in list_dir if '.hdf' in i]
-#     f = gdal.Open(fld + datafile[0])
-#     sic = f.ReadAsArray()
-#     f = gdal.Open('/localdata/LongitudeLatitudeGrid-n6250-Arctic.hdf')
-#     s = f.GetSubDatasets()
-#     lons = gdal.Open(s[0][0]).ReadAsArray()
-#     lats = gdal.Open(s[1][0]).ReadAsArray()
-#     swath_def = geometry.SwathDefinition(lons=lons, lats=lats)
-#         
-#     area_id = 'ease_sh'
-#     name = 'Arctic EASE grid'
-#     proj_id = 'ease_sh'
-#     area_extent = (-2000000, -2000000, 2000000, 2000000)
-#     proj_dict = {'a': '6371228.0', 'units': 'm', 'lon_0': '0',
-#                  'proj': 'laea', 'lat_0': '90'}
-#     area_def = geometry.AreaDefinition(area_id, name, proj_id, proj_dict, x_size,
-#                                        y_size, area_extent)
-#     sic_reprojected = kd_tree.resample_nearest(swath_def, sic, area_def, 6250, nprocs=4, fill_value=None)
-#     mask = np.where(sic_reprojected > 15, True, False)
-#     return mask
-#     
-# 
-# def preprocess_and_project(inp_fld, out_fld, band='both', EPSG=6931):
-#     try:
-#         p = Sentinel1Product(inp_fld) if band == 'both' else Sentinel1ProductS(inp_fld)
-#     except:
-#         print "Can't open the product."
-#         return False
-#     if not os.path.isdir(out_fld):
-#         os.mkdir(out_fld)
-#     p.read_data(band=band, norm=False, incidence_angle_correction=True)
-#     
-#     driver = gdal.GetDriverByName('GTiff')
-#     item_safe = inp_fld.split('/')[-1][:-3] + 'SAFE'
-#     if os.path.isfile(inp_fld):
-#         p_gdal = gdal.Open('/tmp/' + item_safe)
-#     elif os.path.isdir(inp_fld):
-#         p_gdal = gdal.Open(inp_fld)
-#     X = p_gdal.GetRasterBand(1).XSize
-#     Y = p_gdal.GetRasterBand(1).YSize
-#     
-#     if band.lower() == 'both':
-#         band_list = [p.HH, p.HV]
-#     elif band.lower() == 'hh':
-#         band_list = [p.HH]
-#     elif band.lower() == 'hv':
-#         band_list = [p.HV]
-#     else:
-#         print 'Wrong band parameter. Possible values are "both", "hh", "hv"'
-#     for b in band_list:
-#         b.data = median_filter(b.data, size=5)
-#         data = np.zeros((Y, X))
-#         data[:, p.x_min:p.x_max] = ((b.data - b.data.min()) * 32 + 1).astype(np.int)
-#         result = driver.Create(out_fld + 'S1_{0}.tiff'.format(b.des), X, Y)
-#         result.SetGCPs(p_gdal.GetGCPs(), p_gdal.GetGCPProjection())
-#         raster = result.GetRasterBand(1)
-#         raster.WriteArray(data)
-#     
-#     '''sleep a little bit, so data is flushed to HDD'''
-#     raster = False
-#     time.sleep(5)
-#     for b in band_list:
-#         subprocess.call('gdalwarp -ot byte -srcnodata 0 -t_srs EPSG:{0} {1} {2}'.format(EPSG, out_fld + 'S1_{0}.tiff'.format(b.des), out_fld + 'S1_{0}_proj.tiff'.format(b.des)), shell=True)
-#     
-#     if os.path.isdir('/tmp/' + item_safe):
-#         shutil.rmtree('/tmp/' + item_safe)
-#     return True
-
 
 def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', dec=3, first_band='hh', classifier_fld=os.path.dirname(os.path.realpath(__file__)) + '/classifiers/', classifier_name='RFC', nolv=True):
     """ Function for classification of leads on a given product of Sentinel-1 SAR data """
