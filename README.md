@@ -18,4 +18,9 @@ For example
 
 Unpacked products are also supported (at least under Linux) - specify the *.SAFE forlder instead of the *.zip file for this case.
 
+Output of the script is a GeoTiff file with two bands that correspond to two classifications (as described in the paper, link below).
+Numbers correspond to probability of a given pixel to be a lead.
+To create a binary classification a threshold of 50% can be applied to the result.
+
+For any questions contact murashkin@uni-bremen.de.
 Details of the algorithm can be found in Method for detection of leads from Sentinel-1 SAR images in [Annals of Glaciology](https://www.cambridge.org/core/journals/annals-of-glaciology/article/method-for-detection-of-leads-from-sentinel1-sar-images/3FC47FE6D90A3B9021CD753DC37184B9).
