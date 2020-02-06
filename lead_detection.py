@@ -10,7 +10,6 @@ import numpy as np
 import os
 import time
 import gdal
-import shutil
 import joblib
 
 from cv2 import bilateralFilter
@@ -24,7 +23,7 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     t_start = time.time()
     """ Read data """
     try:
-        p = Sentinel1Product(inp_fld + product_name)
+        p = Sentinel1Product(os.path.join(inp_fld, product_name))
     except:
         print "Can't open product {0}.".format(product_name)
         return False
@@ -48,16 +47,16 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     """ Create output GeoTiff file with geolocation grid points """
     if product_name.split('.')[-1] == 'zip':
         import zipfile
-        zf = zipfile.ZipFile(inp_fld + product_name)
+        zf = zipfile.ZipFile(os.path.join(inp_fld, product_name))
         geotifffile = [name for name in zf.namelist() if ('measurement' in name) and ('.tiff' in name)][0]
-        path = '/vsizip/{0}{1}/{2}'.format(inp_fld, product_name, geotifffile)
+        path = '/vsizip/' + os.path.join(inp_fld, product_name, geotifffile)
         p_gdal = gdal.Open(path)
     else:
-        p_gdal = gdal.Open(inp_fld + product_name)
+        p_gdal = gdal.Open(os.path.join(inp_fld, product_name))
     driver = gdal.GetDriverByName('GTiff')
     X = p_gdal.GetRasterBand(1).XSize
     Y = p_gdal.GetRasterBand(1).YSize
-    result = driver.Create(out_fld + product_name + '.tiff', X / dec + 1 if np.remainder(X, dec) else X / dec, Y / dec + 1 if np.remainder(Y, dec) else Y / dec, 2, gdal.GDT_Byte, options=['COMPRESS=DEFLATE'])
+    result = driver.Create(os.path.join(out_fld, product_name + '.tiff'), X / dec + 1 if np.remainder(X, dec) else X / dec, Y / dec + 1 if np.remainder(Y, dec) else Y / dec, 2, gdal.GDT_Byte, options=['COMPRESS=DEFLATE'])
     proj = p_gdal.GetGCPProjection()
     gcps = p_gdal.GetGCPs()
     for gcp in gcps:
@@ -92,10 +91,6 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     band_ratio.WriteArray(data_to_write_ratio)
     result.FlushCache()
                  
-    """ Remove temporal data created when data is unzipped and read """
-    if os.path.isdir('/tmp/' + product_name[:-3] + 'SAFE'):
-        shutil.rmtree('/tmp/' + product_name[:-3] + 'SAFE')
-    
     print 'Current product is processed in {0} sec.'.format(time.time() - t_start)
     return time.time() - t_start
     
