@@ -21,20 +21,18 @@
 """
 
 import numpy as np
-from matplotlib.pyplot import imsave
 try:
     from scipy import weave
 except:
     import weave
-from scipy.misc import imresize
 from scipy import cluster
-from os import listdir, path, mkdir
+from os import path
+from os import mkdir
 import time
-#from gray_level_reduction import gray_levels
 
 
 def haralick(img, window_size=9, n_levels=16, d=1, nthreads=1, result=None, step=1):
-    """ 
+    """
         The function calculates haralick texture features for given image.
         
         It returns np.array of 7 features and the image inself in the following order:
@@ -70,7 +68,7 @@ def haralick(img, window_size=9, n_levels=16, d=1, nthreads=1, result=None, step
         return 0
         
     X, Y = img.shape
-    ws = window_size/2
+    ws = window_size / 2
     Xx, Yy = img[::step, ::step].shape
     size = Xx * Yy
     ret = False
@@ -79,7 +77,7 @@ def haralick(img, window_size=9, n_levels=16, d=1, nthreads=1, result=None, step
         ret = True
    
     code_C_mean = \
-    """    
+    """
     #include <math.h>
     #include <stdio.h>
     #include <string.h>
@@ -311,279 +309,16 @@ def haralick(img, window_size=9, n_levels=16, d=1, nthreads=1, result=None, step
     }
     """
     weave.inline(code_C_mean, ['img', 'X', 'Y', 'n_levels', 'result', 'ws', 'd', 'nthreads', 'step', 'size', 'Yy'],
-                 extra_compile_args = ['-O3 -fopenmp -funroll-loops'], compiler = 'gcc',
-                 libraries = ['gomp'], headers = ['<omp.h>'])    
+                 extra_compile_args=['-O3 -fopenmp -funroll-loops'], compiler='gcc',
+                 libraries=['gomp'], headers=['<omp.h>'])
 
-    result[-1,:,:] = img[::step, ::step]
+    result[-1, :, :] = img[::step, ::step]
     if ret:
         return result.astype(np.float32)
     return True
     
     
-def haralick_sh(img, window_size=9, n_levels=16, d=1, nthreads=1, result=None):
-    """ 
-        The function calculates haralick texture features for given image.
-        
-        It returns np.array of 7 features and the image inself in the following order:
-        ASM, entropy, contrast, homogenity, MAX, correlation, cluster tendency, image itself.
-        The features mentioned can have 'a bit' different definitions in literature.
-        4 GLC Matrixes are calculated, each feature then is computed for sum of the Matrixes.
-        
-        input:
-        
-        img - image, must be a 2D matrix of int8 values;
-        
-        window_size must be odd;
-        
-        n_levels - amount of brightness levels (max(img) must be less than n_levels);
-        
-        d - displacement;
-        
-        nthreads - number of threads for openMP to use, must be integer;
-        
-        result - buffer for result, should be 3d array size of (8, X, Y), where X, Y = img.shape
-        
-        tp - 'mean' by default and this is the only option since 'max' increased noise,
-            'sqrt' is not very usefull // tp is not used anymore!
-        
-        output:
-        
-        normalized values, np.float32 array of (7, img.X, img.Y) size
-    """
-    
-    """ Check that maximal brightness is less than number of gray levels """
-    if img.max() > n_levels:
-        print (img.max() > n_levels)
-        return 0
-        
-    X, Y = img.shape
-    ws = window_size/2
-    ret = False
-    if result is None:
-        result = np.zeros((14, X, Y), np.float32)
-        ret = True
-   
-    code_C_mean = \
-    """    
-    #include <math.h>
-    #include <stdio.h>
-    #include <string.h>
-    
-    double ch[13];
-    double tmp[6];
-    double glcm[n_levels][n_levels];
-    double pxy[n_levels*2], px_y[n_levels], px[n_levels];
-    double p;
-    const double mu = 1/n_levels;
-//    double n_log_n[ws*ws*16];
-    unsigned int ind;
-    const unsigned int s = X * Y;
-//    unsigned int n_square[ws*ws*16];
-    int k, l;
-    int i, j;
-//    int weight;
-    uint16_t glcm_i[n_levels][n_levels];
-    const int dY = d * Y;
-    int weight[ws*2+1][ws*2+1];
-    
-    // Lookup tables    
-//    for (i = 0; i < ws*ws*16; i++)
-//    {
-//       n_log_n[i] = i * log10(i+1);
-//       n_square[i] = pow(i, 2);
-//    }
-
-    // Set kernel weights
-    for (k = 0; k <= 2*ws; k++)
-        for (l = 0; l <= 2*ws; l++)
-            weight[k][l] = fmin(ws - abs(k - ws), ws - abs(l - ws)) + 1;
-    
-    omp_set_num_threads(nthreads);
-    
-    #pragma omp parallel shared(img, weight) private(i, j, glcm, k, l, ind, ch, p, glcm_i, pxy, px_y, px, tmp)
-    #pragma omp for
-    for (i = ws; i < X - ws; i++)
-    {
-        for (j = ws; j < Y - ws; j++)
-        {
-            // set GLCM and features value to be zero
-            memset(glcm_i, 0, sizeof(glcm_i));
-            memset(ch, 0, sizeof(ch));
-            memset(pxy, 0, sizeof(pxy));
-            memset(px_y, 0, sizeof(px_y));
-            memset(px, 0, sizeof(px));
-            memset(tmp, 0, sizeof(tmp));
-            // calculate GLCM
-            // main part of sliding window
-            for (k = -ws; k < ws; k++)
-            {
-                for (l = -ws; l < ws; l++)
-                {
-                    ind = (i+k) * Y + (j+l);
-                    glcm_i[img[ind]][img[ind + dY]] += weight[k+ws][l+ws];     // horisontal-up
-                    glcm_i[img[ind]][img[ind + d]] += weight[k+ws][l+ws];    // vertical-down
-                    glcm_i[img[ind]][img[ind + dY + d]] += weight[k+ws][l+ws];   // diagonal down-right  
-                    glcm_i[img[ind+1]][img[ind + dY]] += weight[k+ws][l+ws];// diagonal down-left
-                }
-                glcm_i[img[(i+ws)*Y + (j+k)]][img[(i+ws)*Y + (j+k+1)]]++;
-                glcm_i[img[(i+k)*Y + (j+ws)]][img[(i+k+1)*Y + (j+ws)]]++;
-            }
-            
-            // Make GLCM symmetrical and summ up all values in the matrix (tmp[0])
-            for (k = 0; k < n_levels; k++)
-                for (l = 0; l <= k; l++)
-                {
-                    glcm_i[k][l] += glcm_i[l][k];
-                    tmp[0] += glcm_i[k][l];
-                }
-                
-            // Normalize glcm - summ of values in the matrix should be equal to 1                                        
-            // Calculate pxy, px_y, px
-            // Calculate standard deviation for px (tmp[1] is variance, tmp[2] is std)
-            for (k = 0; k < n_levels; k++)
-            {
-                for (l = 0; l < k; l++)
-                {
-                    glcm[k][l] = glcm_i[k][l] / tmp[0];
-                    pxy[k + l] += 2 * glcm[k][l];
-                    px_y[k - l] += 2 * glcm[k][l];
-                    px[k] += glcm[k][l];
-                }
-                glcm[k][k] = glcm_i[k][k] / tmp[0];
-                pxy[k + k] += glcm[k][k];
-                px_y[0] += glcm[k][k];
-                px[k] += glcm[k][k];
-                tmp[1] += (mu - px[k])*(mu - px[k]);
-            }
-            tmp[2] = sqrt(tmp[1]);
-            
-            //calculate characteristics
-            for (k = 0; k < n_levels; k++)
-            {
-                for (l = 0; l < k; l++)
-                {
-                    p = glcm[k][l];
-                    if (p)
-                    {
-                        // ASM
-                        //ch[0] += 2 * n_square[p];
-                        ch[0] += 2 * p * p;
-
-                        // Entropy
-                        //ch[1] += 2 * n_log_n[p];
-                        ch[1] += 2 * p * log10(p + 1.);
-                        
-                        // Contrast
-                        ch[2] += 2 * (l-k)*(l-k) * p;
-
-                        // Homogenity
-                        ch[3] += 2 * p / ((l-k)*(l-k) + 1);
-                        
-                        // Inverse Difference Moment
-                        ch[5] += 2 * p / (1 + (k - l) * (k - l));
-                        
-                        // Correlation
-                        //ch[6] += 2 * p * (mu - k) * (mu - l);
-                        ch[6] += 2 * (k*l*p - mu*mu) / (tmp[2]);
-                        
-                        // Cluster Tendency
-                        ch[7] += 2 * p * ((k - mu) + (l - mu));
-                        // HXY1 (tmp[3]) and HXY2 (tmp[4])
-                        tmp[3] += 2 * p * log10(px[k] * px[l] + 1.);
-                        tmp[4] += px[k] * px[l] * log10(px[k] * px[l] + 1.);
-                    }
-                }
-                p = glcm[k][k];
-                if (p)
-                {
-                    // ASM
-                    //ch[0] += n_square[p];
-                    ch[0] += p * p;
-
-                    // Entropy
-                    //ch[1] += n_log_n[p];
-                    ch[1] += p * log10(p + 1.);
-                    
-                    // Contrast
-                    ch[2] += (l-k)*(l-k) * p;
-
-                    // Homogenity
-                    ch[3] += p / ((l-k)*(l-k) + 1);
-                    
-                    // Inverse Difference Moment
-                    ch[5] += p / (1 + (k - l) * (k - l));
-
-                    // Correlation
-                    //ch[6] += p * (mu - k) * (mu - l);
-                    ch[6] += (k*l*p - mu*mu) / (tmp[2]);
-                    
-                    // Cluster Tendency
-                    //ch[7] += p * (k - mu) * (k - mu);
-                    // HXY1 (tmp[3]) and HXY2 (tmp[4])
-                    tmp[3] += p * log10(px[k] * px[k] + 1.);
-                    tmp[4] += px[k] * px[k] * log10(px[k] * px[k] + 1.);
-                }
-            }
-            
-            for (k = 1; k < 2*n_levels - 1; k++)
-            {
-                // Sum Average == Cluster Tendency that is p * ((k - mu) + (l - mu))
-                ch[8] += k * pxy[k];
-                
-                // Sum Variance
-                ch[9] += (k - ch[8])*(k - ch[8]) * pxy[k];
-                
-                // Sum entropy
-                ch[10] += pxy[k] * log10(pxy[k] + 1.);
-            }
-            for (k = 0; k < n_levels; k++)
-            {
-                // Difference variance
-                ch[11] += mu - px_y[k];
-                
-                //Difference entropy
-                ch[12] += px_y[k] * log10(px_y[k] + 1.);
-                
-                // Probability of a run of length
-                //ch[7] += (px[k] - glcm[k][k])*(px[k] - glcm[k][k]) * pow(glcm[k][k], 2) / (pow(px[k], 3)+0.001);
-                
-                // px entroty (tmp[5])
-                tmp[5] += px[k] * log10(px[k] + 1.);
-            }
-            ch[4] = (ch[1] - tmp[3]) / tmp[5];
-            ch[7] = sqrt(1 - exp(-2.0 * (-tmp[4] + ch[1])));
-            
-            is = i / step;
-            js = j / step;
-            result[is*Y + j] = ch[0];
-            //result[is*Y + js + s] = ch[1];
-            result[is*Y + js + 2*s] = ch[2];
-            result[is*Y + js + 3*s] = ch[3];
-            result[is*Y + js + 4*s] = ch[4];
-            //result[is*Y +s j + 5*s] = ch[5];
-            result[is*Y + js + 6*s] = ch[6];
-            result[is*Y + js + 7*s] = ch[7];
-            result[is*Y + js + 8*s] = ch[8];
-            result[is*Y + js + 9*s] = ch[9];
-            result[is*Y + js + 10*s] = ch[10];
-            result[is*Y + js + 11*s] = ch[11];
-            result[is*Y + js + 12*s] = ch[12];
-        }
-    }
-    """
-    
-    weave.inline(code_C_mean, ['img', 'X', 'Y', 'n_levels', 'result', 'ws', 'd', 'nthreads'],
-                 extra_compile_args = ['-O3 -fopenmp -funroll-loops'], compiler = 'gcc',
-                 libraries = ['gomp'], headers = ['<omp.h>'])    
-
-    result[-1,:,:] = img
-    result[7,:,:] = np.nan_to_num(result[7,:,:])
-    if ret:
-        return result.astype(np.float32)
-    return True
-
-
-def save_haralick_features(data, directory, full_image=False, preview=0.2):
+def save_haralick_features(data, directory):
     """
         Save Haralick texture features given by 'data' in numpy binary format in 'directory',
         Save image preview (5 times smaller) in png format. Do not save it if 'preview' is False
@@ -593,11 +328,6 @@ def save_haralick_features(data, directory, full_image=False, preview=0.2):
         mkdir(directory)
     for n, i in enumerate(data):
         np.save(directory + 'f{0}'.format(n), i.astype(np.float32))
-        if full_image:
-            imsave(directory + 'full_f{0}.png'.format(n), i, format='png')
-        if preview:
-            imsave(directory + 'preview_f{0}.png'.format(n), imresize(i, size=preview),
-                   format='png', cmap='jet')
 
 
 def features_glr_direct(data, n_levels, nthreads=1, distance=1, win_size=9, result=None):
@@ -609,7 +339,7 @@ def features_glr_direct(data, n_levels, nthreads=1, distance=1, win_size=9, resu
     if result is None:
         result = np.zeros((14, X, Y), np.float32)
         ret = True
-    data1 = ((n_levels-1)*data).astype(np.int8)
+    data1 = ((n_levels - 1) * data).astype(np.int8)
     data1 = haralick(data1, win_size, n_levels=n_levels, d=distance, nthreads=nthreads)
     data1 = data1.astype(np.float32)
     if ret:
@@ -644,16 +374,14 @@ def features_glr_kmeans(data, n_levels, nthreads=1, distance=1, win_size=9, resu
 if __name__ == '__main__':
     pass
     from sentinel1 import Sentinel1Product
-    #p = Sentinel1Product('/exzell/d.murashkin/DFBF/S1A_EW_GRDM_1SDH_20151001T073540_20151001T073640_007956_00B1EE_DFBF.SAFE')
     p = Sentinel1Product('/exzell2/d.murashkin/S2_raw/S1A_EW_GRDM_1SDH_20160917T070354_20160917T070454_013089_014C4A_49EB.zip')
     p.read_data_p()
-    data = p.HH.data[:5000,:] - p.HV.data[:5000,:]
+    data = p.HH.data[:5000, :] - p.HV.data[:5000, :]
     data -= data.min()
     data /= data.max()
     data = (15 * data).astype(np.int8)
-    X, Y = data[::3,::3].shape
+    X, Y = data[::3, ::3].shape
     r = np.zeros((14, X, Y))
     t = time.time()
     haralick(data, nthreads=4, result=r, window_size=9, step=3)
     print time.time() - t
-    

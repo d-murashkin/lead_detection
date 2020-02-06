@@ -16,7 +16,7 @@ import joblib
 from cv2 import bilateralFilter
 
 from haralick import haralick
-from sentinel1 import Sentinel1Product
+from sentinel1_routines.reader import Sentinel1Product
             
 
 def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', dec=3, first_band='hh', classifier_fld=os.path.dirname(os.path.realpath(__file__)) + '/classifiers/', classifier_name='RFC', nolv=True):
@@ -29,7 +29,7 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
         print "Can't open product {0}.".format(product_name)
         return False
     
-    p.read_data_p(keep_useless_data=False)
+    p.read_data(keep_useless_data=False, parallel=True)
 
     """ Perform classification """
     if first_band == 'hh':
@@ -47,7 +47,11 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     
     """ Create output GeoTiff file with geolocation grid points """
     if product_name.split('.')[-1] == 'zip':
-        p_gdal = gdal.Open('/tmp/' + product_name[:-3] + 'SAFE')
+        import zipfile
+        zf = zipfile.ZipFile(inp_fld + product_name)
+        geotifffile = [name for name in zf.namelist() if ('measurement' in name) and ('.tiff' in name)][0]
+        path = '/vsizip/{0}{1}/{2}'.format(inp_fld, product_name, geotifffile)
+        p_gdal = gdal.Open(path)
     else:
         p_gdal = gdal.Open(inp_fld + product_name)
     driver = gdal.GetDriverByName('GTiff')
