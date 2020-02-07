@@ -27,6 +27,9 @@ And then activate the environment with
 Sentinel-1 reading routines from [Sentinel-1 routines](https://github.com/d-murashkin/sentinel1_routines) are required.
 Clone the repository into your work directory (a work directory can be added to pythonpath with ```conda develop <path>```.
 
+Since files with classifiers are uploaded with Git Large File Storage, one needs to install git lfs from [Git Large File Storage](https://git-lfs.github.com/) and run
+``` git lfs clone``` instead of ``` git clone ``` to clone this repository.
+
 To perform lead mapping on a single Sentinel-1 scene use process_single_product.py script.
 
 The script has three inputs: source folder (-s <source_folder>), destination folder (-d <destination_folder>), and name of the zip-file with the scene.
