@@ -1,20 +1,20 @@
-# -*- coding: utf-8 -*-
 """
 The script containes some functions for lead detection.
 calculate_features - texture features calculation for a given product
 texture_features_single_product - for parallel calculation of TF. Saves results on disk
 classify - classification basen on texture features of products from a given folder
+
+@autor: Dmitrii Murashkin (murashkin@uni-bremen.de)
 """
 
 import numpy as np
 import os
 import time
-import gdal
 import joblib
 
 from cv2 import bilateralFilter
 
-from haralick import haralick
+from glcm_features import calculate_glcm_features
 from sentinel1_routines.reader import Sentinel1Product
             
 
@@ -23,79 +23,38 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     t_start = time.time()
     """ Read data """
     try:
-        p = Sentinel1Product(os.path.join(inp_fld, product_name))
+        p = Sentinel1Product(inp_fld + product_name)
     except:
         print "Can't open product {0}.".format(product_name)
         return False
     
     p.read_data(keep_useless_data=False, parallel=True)
+    p.HH.data = p.HH.data / 10 / np.log10(np.e)
+    p.HV.data = p.HV.data / 10 / np.log10(np.e)
 
     """ Perform classification """
     if first_band == 'hh':
-        result_product = classify_(p.HH.data, band='hh', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
+        result_product = _classify(p.HH.data, band='hh', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
     elif first_band == 'product':
         product = p.HH.data + p.HV.data
-        result_product = classify_(product, band='product', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
+        result_product = _classify(product, band='product', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
     else:
         print "Wrong first band name: {0}. Options are 'hh' and 'product'.".format(first_band)
         return False
-
+    
     ratio = p.HH.data - p.HV.data
     ratio[p.HV.data > -5.2] = 0
-    result_ratio = classify_(ratio, band='ratio', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
-    
+    result_ratio = _classify(ratio, band='ratio', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
+
     """ Create output GeoTiff file with geolocation grid points """
-    if product_name.split('.')[-1] == 'zip':
-        import zipfile
-        zf = zipfile.ZipFile(os.path.join(inp_fld, product_name))
-        geotifffile = [name for name in zf.namelist() if ('measurement' in name) and ('.tiff' in name)][0]
-        path = '/vsizip/' + os.path.join(inp_fld, product_name, geotifffile)
-        p_gdal = gdal.Open(path)
-    else:
-        p_gdal = gdal.Open(os.path.join(inp_fld, product_name))
-    driver = gdal.GetDriverByName('GTiff')
-    X = p_gdal.GetRasterBand(1).XSize
-    Y = p_gdal.GetRasterBand(1).YSize
-    result = driver.Create(os.path.join(out_fld, product_name + '.tiff'), X / dec + 1 if np.remainder(X, dec) else X / dec, Y / dec + 1 if np.remainder(Y, dec) else Y / dec, 2, gdal.GDT_Byte, options=['COMPRESS=DEFLATE'])
-    proj = p_gdal.GetGCPProjection()
-    gcps = p_gdal.GetGCPs()
-    for gcp in gcps:
-        gcp.GCPLine /= dec
-        gcp.GCPPixel /= dec
-
-    result.SetGCPs(gcps, proj)
-    band_prod = result.GetRasterBand(1)
-    band_ratio = result.GetRasterBand(2)
+    from sentinel1_routines.writer import write_data_geotiff
+    write_data_geotiff(np.stack([(result_product * 100).astype(np.uint8), (result_ratio * 100).astype(np.uint8)], axis=2), out_fld + product_name + '.tiff', p.gdal_data, dec=dec, nodata_val=101)
     
-    x_min = p.x_min / dec if np.remainder(p.x_min, dec) else p.x_min / dec + 1
-    x_max = p.x_max / dec if np.remainder(p.x_max, dec) else p.x_max / dec + 1
-
-    """ Create output array for data to be written in the GeoTiff file """
-    data_to_write_prod = np.zeros((band_prod.YSize, band_prod.XSize), dtype=np.int8)
-    data_to_write_prod[:, x_min:x_min + result_product.shape[1]] = (result_product * 100).astype(np.int8)
-    data_to_write_ratio = np.zeros((band_ratio.YSize, band_ratio.XSize), dtype=np.int8)
-    data_to_write_ratio[:, x_min:x_min + result_ratio.shape[1]] = (result_ratio * 100).astype(np.int8)
-                 
-    no_data_val = 101
-    data_to_write_prod[0, :] = data_to_write_prod[-1, :] = data_to_write_prod[:, 0] = data_to_write_prod[:, -1] = no_data_val
-    data_to_write_prod[:, :x_min + 1] = no_data_val
-    data_to_write_prod[:, x_max:] = no_data_val
-    data_to_write_prod[p.HH.nodata_mask[::dec, ::dec]] = no_data_val
-    data_to_write_ratio[0, :] = data_to_write_ratio[-1, :] = data_to_write_ratio[:, 0] = data_to_write_ratio[:, -1] = no_data_val
-    data_to_write_ratio[:, :x_min + 1] = no_data_val
-    data_to_write_ratio[:, x_max:] = no_data_val
-    data_to_write_ratio[p.HH.nodata_mask[::dec, ::dec]] = no_data_val
-    
-    """ Write results in the GeoTiff file and flush it on hard drive """
-    band_prod.WriteArray(data_to_write_prod)
-    band_ratio.WriteArray(data_to_write_ratio)
-    result.FlushCache()
-                 
     print 'Current product is processed in {0} sec.'.format(time.time() - t_start)
     return time.time() - t_start
     
     
-def classify_(data, band, dec=1, inp_fld='out/', classifier='RFC', nolv=True):
+def _classify(data, band, dec=1, inp_fld='out/', classifier='RFC', nolv=True):
     """ Implementation of the main classification algorithm """
     thresholds = np.array([((-6., -1.),
                             (-7.5, -4.5),
@@ -106,6 +65,8 @@ def classify_(data, band, dec=1, inp_fld='out/', classifier='RFC', nolv=True):
                             (-3., 3.),
                             (-3., 3.))])
 
+    if data.shape[0] % dec != 0:
+        data = data[:data.shape[0] // dec * dec, ...]
     X, Y = data[::dec, ::dec].shape
 
     clf = joblib.load(inp_fld + classifier + '_' + band + '.pkl')
@@ -133,13 +94,13 @@ def classify_(data, band, dec=1, inp_fld='out/', classifier='RFC', nolv=True):
         clip_normalize(local_variations, nmin, nmax)
         local_variations = (15 * local_variations).astype(np.uint8)
         TF_local_variations = np.zeros((13, X, Y))
-        haralick(local_variations, nthreads=16, result=TF_local_variations, step=dec)
+        calculate_glcm_features(local_variations, nthreads=16, result=TF_local_variations, step=dec)
     
     data = bilateralFilter(data, 5, 15, 15)
     clip_normalize(data, bmin, bmax)
     data = (15 * data).astype(np.uint8)
     TF_data = np.zeros((13, X, Y))
-    haralick(data, nthreads=16, result=TF_data, step=dec)
+    calculate_glcm_features(data, nthreads=16, result=TF_data, step=dec)
 
     if not nolv:
         TF = np.hstack([TF_data.reshape((13, X * Y)).T, TF_local_variations[:-1].reshape((12, X * Y)).T])
@@ -149,7 +110,8 @@ def classify_(data, band, dec=1, inp_fld='out/', classifier='RFC', nolv=True):
     TF = np.delete(TF, feature_elimination_list, 1)
     TF_local_variations, TF_data = None, None
     result = clf.predict_proba(TF)
-    return result[:, 1].reshape(X, Y)
+    result = result[:, 1].reshape(X, Y)
+    return result
 
 
 def clip_normalize(x, xmin, xmax):

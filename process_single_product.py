@@ -1,8 +1,8 @@
 """
 The script processes single Sentinel-1 products.
-Source folder, output folder and filename should be specified.
+Sourse folder, output folder and filename should be specified.
 
-The script supports the Linux's parallel command, for example:
+The script is made to be used with Linux parallel function, for example:
 ls <sourse_folder> | parallel python single_product_TF -s <sourse_folder> -d <destination_folder> {}
 or if 'parallel' is not available:
 ls <sourse_folder> | xargs -n1 --max-procs=4 -I {} python single_product_TF -s <sourse_folder> -d <destination_folder> {}
@@ -15,7 +15,7 @@ will return first 3 files in the directory.
 Some parameters of the processing chain can be modified in this script.
 These parameters can also be added as agruments to the script in the future.
 
-@author: Dmitrii Murashkin (murashkin@uni-bremen.de) / Institute of Enviromental Physics, University of Bremen
+@author: Dmitrii Murashkin (murashkin@uni-bremen.de)
 """
 
 import argparse
