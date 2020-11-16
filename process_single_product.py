@@ -53,12 +53,17 @@ if __name__ == '__main__':
                 if name in item:
                     scene_name = item
                     break
+    else:
+        input_folder = args.s
 
     if not args.d:
         print('Destination folder is not specified(-d key), so the current working directory is used for output.')
+        output_folder = ''
+    else:
+        output_folder = args.d
 
     t = time.time()
 
-    process_single_product(inp_fld=args.s, out_fld=args.d, product_name=args.filename,
+    process_single_product(inp_fld=input_folder, out_fld=output_folder, product_name=scene_name,
                            dec=2, first_band='hh', nolv=True, classifier_name='RFC_nolv')
     print('Product {0} is processed in {1} sec.'.format(args.filename, time.time() - t))
