@@ -4,24 +4,34 @@ Algorithm for sea ice lead mapping of Sentinel-1 SAR images taken over the Arcti
 
 Requirements:
 Python packages:
-* scikit-learn=0.18.1
+* scikit-learn
 * opencv
 * weave
-* gdal
+* gdal >= 2.3
 * pillow
 * joblib
 
 System:
-* linux (not tested under Windows or Mac)
+* Linux (not tested under Windows or Mac)
 * 64Gb RAM (might work with 32Gb, but not tested)
 * multiple core/processor systems are recommended
 
 Before any of the scripts is run it is highly recommended to install an [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) environment from the ```environment.yml``` file.
 
 Run
-```conda env create --name lead_detection --file environment.yml```.
+```bash
+conda env create --name lead_detection python=2
+```
 And then activate the environment with
-```conda activate lead_detection```.
+```bash
+conda activate lead_detection
+```
+Now install required packages:
+```bash
+conda install -c conda-forge weave
+conda install -c defaults pillow joblib scikit-learn opencv
+conda install -c defaults gdal>=2.3
+```
 
 
 Sentinel-1 reading routines from [Sentinel-1 routines](https://github.com/d-murashkin/sentinel1_routines) are required.
