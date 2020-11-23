@@ -45,10 +45,10 @@ if __name__ == '__main__':
             print('Please, specify source folder using -s key or data root folder with --data_root.')
             sys.exit()
         else:
-            scn_time = scene_time
+            scn_time = scene_time(args.filename)
             input_folder = os.path.join(args.data_root, scn_time.strftime('%Y'), scn_time.strftime('%m'), scn_time.strftime('%d'), 'PRODUCT')
             """ Search for the exect scene name since last 4 characters might differ. """
-            name = scene_name.split('.')[0][:-3]
+            name = scene_name.split('.')[0][:-4]
             for item in os.listdir(input_folder):
                 if name in item:
                     scene_name = item
