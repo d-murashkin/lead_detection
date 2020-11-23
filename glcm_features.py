@@ -264,7 +264,7 @@ def calculate_glcm_features(img, window_size=9, n_levels=16, d=1, nthreads=1, re
     }
     """
     weave.inline(code_C_mean, ['img', 'X', 'Y', 'n_levels', 'result', 'ws', 'd', 'nthreads', 'step', 'size', 'Yy'],
-                 extra_compile_args=['-O3 -fopenmp -funroll-loops'], compiler='gcc',
+                 extra_compile_args=['-O3 -fopenmp'], compiler='gcc',
                  libraries=['gomp'], headers=['<omp.h>'])
 
     result[-1, :, :] = img[::step, ::step]
