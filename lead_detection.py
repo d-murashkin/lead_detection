@@ -23,12 +23,13 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     t_start = time.time()
     """ Read data """
     try:
-        p = Sentinel1Product(inp_fld + product_name)
+        p = Sentinel1Product(os.path.join(inp_fld, product_name))
     except:
-        print "Can't open product {0}.".format(product_name)
+        print("Can't open product {0}".format(product_name))
+        print("From folder {0}".format(inp_fld))
         return False
     
-    p.read_data(keep_useless_data=False, parallel=True)
+    p.read_data(keep_calibration_data=False, parallel=True, correct_hv=False)
     p.HH.data = p.HH.data / 10 / np.log10(np.e)
     p.HV.data = p.HV.data / 10 / np.log10(np.e)
 
@@ -48,9 +49,9 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
 
     """ Create output GeoTiff file with geolocation grid points """
     from sentinel1_routines.writer import write_data_geotiff
-    write_data_geotiff(np.stack([(result_product * 100).astype(np.uint8), (result_ratio * 100).astype(np.uint8)], axis=2), out_fld + product_name + '.tiff', p.gdal_data, dec=dec, nodata_val=101)
+    write_data_geotiff(np.stack([(result_product * 100).astype(np.uint8), (result_ratio * 100).astype(np.uint8)], axis=2), os.path.join(out_fld, product_name + '.tiff'), p.gdal_data, dec=dec, nodata_val=101)
     
-    print 'Current product is processed in {0} sec.'.format(time.time() - t_start)
+    print 'Scene {0} is processed in {1} sec.'.format(product_name, time.time() - t_start)
     return time.time() - t_start
     
     
