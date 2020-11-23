@@ -16,7 +16,7 @@ System:
 * 64Gb RAM (might work with 32Gb, but not tested)
 * multiple core/processor systems are recommended
 
-Before any of the scripts is run it is highly recommended to install an [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) environment from the ```environment.yml``` file.
+To avoid possible conflicts with the requires libraries it is recommended to install [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) and create a new environment as described below.
 
 Run
 ```bash
