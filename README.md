@@ -30,7 +30,7 @@ Now install required packages:
 ```bash
 conda install -c conda-forge weave
 conda install -c defaults pillow joblib scikit-learn opencv
-conda install -c defaults gdal>=2.3
+conda install -c defaults "gdal>=2.3"
 ```
 
 
