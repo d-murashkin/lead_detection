@@ -42,8 +42,9 @@ if __name__ == '__main__':
 
     if not args.s:
         if not args.data_root:
-            print('Please, specify source folder using -s key or data root folder with --data_root.')
-            sys.exit()
+            print('Neither source folder (-s key) nor data root folder (--data_root key) is specified.')
+            print('Current working directory is used as the source folder.')
+            input_folder = os.getcwd()
         else:
             scn_time = scene_time(args.filename)
             input_folder = os.path.join(args.data_root, scn_time.strftime('%Y'), scn_time.strftime('%m'), scn_time.strftime('%d'), 'PRODUCT')
@@ -58,7 +59,7 @@ if __name__ == '__main__':
 
     if not args.d:
         print('Destination folder is not specified(-d key), so the current working directory is used for output.')
-        output_folder = ''
+        output_folder = os.getcwd()
     else:
         output_folder = args.d
 
