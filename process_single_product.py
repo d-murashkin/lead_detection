@@ -22,6 +22,7 @@ import argparse
 import sys
 import time
 import os
+import shutil
 
 from lead_detection import lead_classification as process_single_product
 from sentinel1_routines.utils import scene_time
@@ -33,6 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', help='destination folder')
     parser.add_argument('filename', help='product file name')
     parser.add_argument('--data_root', help='path to the data folder. Inside the data folder the structure should be the following: <data_folder>/<year>/<month>/<day>/PRODUCT/<scene>')
+    parser.add_argument('--search_existing_results', default=None, help='If result already exists in the specified root folder, just copy it in the destination folder')
     args = parser.parse_args()
     
     if not args.filename:
@@ -63,8 +65,15 @@ if __name__ == '__main__':
     else:
         output_folder = args.d
 
-    t = time.time()
+    if args.search_existing_results:
+        expected_path = os.path.join(args.search_existing_results, scn_time.strftime('%Y'), scn_time.strftime('%m'), scn_time.strftime('%d'), 'single_scenes', scene_name + '.tiff')
+        print(expected_path)
+        if os.path.exists(expected_path):
+            shutil.copyfile(expected_path, os.path.join(output_folder, scene_name + '.tiff'))
+            print('Scene {0} already exists, result is copied in the destination folder'.format(scene_name))
+            sys.exit()
 
+    t = time.time()
     process_single_product(inp_fld=input_folder, out_fld=output_folder, product_name=scene_name,
                            dec=2, first_band='hh', nolv=True, classifier_name='RFC_nolv')
     print('Product {0} is processed in {1} sec.'.format(args.filename, time.time() - t))
