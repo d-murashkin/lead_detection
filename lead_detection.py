@@ -14,7 +14,7 @@ import joblib
 
 from cv2 import bilateralFilter
 
-from glcm_features import calculate_glcm_features
+from .glcm_features import calculate_glcm_features
 from sentinel1_routines.reader import Sentinel1Product
             
 
