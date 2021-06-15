@@ -40,7 +40,7 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
         product = p.HH.data + p.HV.data
         result_product = _classify(product, band='product', dec=dec, inp_fld=classifier_fld, classifier=classifier_name, nolv=nolv)
     else:
-        print "Wrong first band name: {0}. Options are 'hh' and 'product'.".format(first_band)
+        print("Wrong first band name: {0}. Options are 'hh' and 'product'.".format(first_band))
         return False
     
     ratio = p.HH.data - p.HV.data
@@ -51,7 +51,7 @@ def lead_classification(inp_fld, out_fld, product_name, leads_fileID='leads', de
     from sentinel1_routines.writer import write_data_geotiff
     write_data_geotiff(np.stack([(result_product * 100).astype(np.uint8), (result_ratio * 100).astype(np.uint8)], axis=2), os.path.join(out_fld, product_name + '.tiff'), p.gdal_data, dec=dec, nodata_val=101)
     
-    print 'Scene {0} is processed in {1} sec.'.format(product_name, time.time() - t_start)
+    print('Scene {0} is processed in {1} sec.'.format(product_name, time.time() - t_start))
     return time.time() - t_start
     
     
@@ -70,7 +70,7 @@ def _classify(data, band, dec=1, inp_fld='out/', classifier='RFC', nolv=True):
         data = data[:data.shape[0] // dec * dec, ...]
     X, Y = data[::dec, ::dec].shape
 
-    clf = joblib.load(inp_fld + classifier + '_' + band + '.pkl')
+    clf = joblib.load(os.path.join(inp_fld, classifier + '_' + band + '.pkl'))
     if band == 'product':
         [bmin, bmax], [nmin, nmax] = thresholds[:, 2, :]
         if nolv:
